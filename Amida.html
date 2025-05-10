@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>横向きあみだくじジェネレーター</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        html, body { /* htmlとbodyに高さを設定 */
+            height: 100%;
+            margin: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            padding: 15px;
+            background-color: #e9ebee;
+            color: #1c1e21;
+            display: flex;
+            flex-direction: column; /* kuji-app-containerを縦に伸ばすため */
+            align-items: center; /* kuji-app-containerを中央寄せ */
+            font-size: 16px;
+            box-sizing: border-box; /* パディングを含めた高さ計算のため */
+        }
+
+        .kuji-app-container {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px; /* 少し広げる */
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex-grow: 1; /* bodyの高さに対して伸びる */
+            min-height: 0; /* flexアイテムの縮小問題を避けるため */
+            box-sizing: border-box;
+        }
+
+        .section-title {
+            font-size: 1.375em;
+            font-weight: 600;
+            color: #1877f2;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #dddfe2;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        /* あみだくじ表示エリア */
+        .amida-display-section {
+            width: 100%;
+            display: flex; /* 子要素のSVGコンテナを伸ばすため */
+            flex-direction: column; /* 子要素を縦に配置 */
+            flex-grow: 1; /* kuji-app-container の中で可能な限り高さを取る */
+            min-height: 0; /* flexアイテムの縮小問題を避けるため */
+        }
+        #amidakuji_svg_container {
+            border: 1px solid #dddfe2;
+            background-color: #f0f2f5;
+            min-height: 200px; /* スマホでの最小高さ */
+            /* max-height: 50vh; を削除または緩和 */
+            overflow: auto;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 6px;
+            flex-grow: 1; /* amida-display-section の中で可能な限り高さを取る */
+        }
+        #amidakuji_svg_container svg {
+            display: block;
+            max-width: 100%; /* SVGがコンテナ幅を超えないように */
+            max-height: 100%; /* SVGがコンテナ高さを超えないように */
+        }
+        #amidakuji_svg_container p {
+            color: #606770;
+            font-size: 1em;
+            padding: 20px;
+            text-align: center;
+        }
+
+
+        /* 入力＆設定エリア */
+        .input-config-section {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .config-row {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            width: 100%;
+        }
+        .config-group {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .config-group .group-title,
+        .config-group label {
+            font-size: 0.9375em;
+            font-weight: 600;
+            color: #606770;
+            margin-bottom: 2px;
+            padding-left: 2px;
+        }
+        textarea, select {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 12px;
+            border: 1px solid #ccd0d5;
+            border-radius: 6px;
+            font-size: 0.7em;
+            background-color: #f5f6f7;
+            color: #1c1e21;
+            line-height: 1.4;
+        }
+        textarea::placeholder, select::placeholder {
+            color: #8a8d91;
+        }
+        textarea {
+            height: 100px; /* 少し低めに設定、必要ならresize可 */
+            resize: vertical;
+        }
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M5%207.5L10%2012.5L15%207.5%22%20stroke%3D%22%23606770%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 14px;
+            padding-right: 35px;
+        }
+
+
+        /* メッセージエリア */
+        .message-area {
+            text-align: center;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 0.9375em;
+            min-height: 20px;
+            margin-top: 5px;
+            display: none;
+        }
+        .message-area.active {
+            display: block;
+        }
+        .error-message {
+            background-color: #fdecea;
+            color: #a94442;
+            border: 1px solid #ebccd1;
+        }
+        .info-message {
+            background-color: #e7f3ff;
+            color: #1877f2;
+            border: 1px solid #d2e7ff;
+        }
+
+
+        /* アクションボタンエリア */
+        .action-buttons-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+            margin-top: 15px;
+        }
+        .action-buttons-section button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: opacity 0.2s ease;
+            width: 100%;
+            max-width: 320px;
+        }
+        .action-buttons-section button:hover {
+            opacity: 0.9;
+        }
+        #generate_button {
+            background-color: #42b72a;
+            color: white;
+        }
+        #reset_button {
+            background-color: #fa3e3e;
+            color: white;
+        }
+
+        /* SVG内のスタイル */
+        .start-text {
+            cursor: pointer;
+            fill: #1c1e21;
+            transition: fill 0.2s ease, font-weight 0.2s ease;
+            /* font-size はJSで設定 */
+        }
+        .start-text:hover {
+            fill: #1877f2;
+            font-weight: bold;
+        }
+        .path-trace {
+            stroke-width: 2.5px;
+        }
+        .goal-text {
+             fill: #1c1e21;
+             /* font-size はJSで設定 */
+        }
+        .goal-text.highlighted {
+            font-weight: bold;
+        }
+        .amida-path-line {
+            stroke: #ced0d4;
+            stroke-width: 2px;
+        }
+        .amida-connecting-line {
+            stroke: #bec3c9;
+            stroke-width: 2px;
+        }
+
+        /* PC向けレイアウト調整 (例: 画面幅768px以上) */
+        @media (min-width: 768px) {
+            .kuji-app-container {
+                padding: 25px 30px;
+                gap: 25px;
+            }
+            .config-row {
+                flex-direction: row;
+                gap: 20px;
+            }
+            textarea {
+                height: 120px; /* PCでは少し高めでもOK */
+            }
+             .action-buttons-section {
+                flex-direction: row;
+                justify-content: center;
+                gap: 15px;
+            }
+            .action-buttons-section button {
+                width: auto;
+                min-width: 160px;
+            }
+            #amidakuji_svg_container {
+                min-height: 350px; /* PCではSVGコンテナの最小高さをより大きく */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="kuji-app-container">
+        <div class="amida-display-section">
+            <h2 class="section-title">あみだくじ</h2>
+            <div id="amidakuji_svg_container">
+                <p>ここに、あみだくじが表示されます。</p>
+            </div>
+        </div>
+
+        <div class="input-config-section">
+            <div class="config-row">
+                <div class="config-group">
+                    <h3 class="group-title">スタート項目</h3>
+                    <textarea id="start_items"></textarea>
+                </div>
+                <div class="config-group">
+                    <h3 class="group-title">ゴール項目</h3>
+                    <textarea id="goal_items"></textarea>
+                </div>
+            </div>
+
+            <div class="config-row">
+                <div class="config-group">
+                    <label for="density">接続線の密度:</label>
+                    <select id="density">
+                        <option value="low">少なめ</option>
+                        <option value="medium" selected>普通</option>
+                        <option value="high">多め</option>
+                    </select>
+                </div>
+                <div class="config-group">
+                    <label for="animation_speed">アニメーション速度:</label>
+                    <select id="animation_speed">
+                        <option value="0.5">速い (0.5s)</option>
+                        <option value="1.0" selected>標準 (1.0s)</option>
+                        <option value="1.5">ゆっくり (1.5s)</option>
+                        <option value="2.0">かなりゆっくり (2.0s)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div id="message_output_area" class="message-area"></div>
+
+        <div class="action-buttons-section">
+            <button id="generate_button">あみだを作成</button>
+            <button id="reset_button">リセット</button>
+        </div>
+    </div>
+
+    <script>
+        const startItemsTextarea = document.getElementById('start_items');
+        const goalItemsTextarea = document.getElementById('goal_items');
+        const generateButton = document.getElementById('generate_button');
+        const resetButton = document.getElementById('reset_button');
+        const svgContainer = document.getElementById('amidakuji_svg_container');
+        const messageOutputArea = document.getElementById('message_output_area');
+        const densitySelect = document.getElementById('density');
+        const animationSpeedSelect = document.getElementById('animation_speed');
+
+        const SVG_NS = "http://www.w3.org/2000/svg";
+        const PADDING = 20; // SVG内パディングを少し調整
+        const TEXT_AREA_WIDTH_LEFT = 65;  // SVG内テキストエリア幅を少し縮小
+        const TEXT_AREA_WIDTH_RIGHT = 65; // SVG内テキストエリア幅を少し縮小
+        const TEXT_COLOR = "#1c1e21";
+        const TRACE_COLORS = ['#1877f2', '#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#d35400'];
+
+        let currentAmidaData = {
+            startLabels: [],
+            goalLabels: [],
+            numPaths: 0,
+            connectingLines: [],
+            pathSpacing: 0,
+            svgWidth: 0,
+            svgHeight: 0,
+            actualDrawingWidth: 0,
+            goalTextElements: []
+        };
+        let currentTracedPathElement = null;
+        let currentHighlightedGoalText = null;
+
+        function parseItems(text) {
+            return text.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+        }
+
+        function displayMessage(message, type = 'error') {
+            messageOutputArea.textContent = message;
+            messageOutputArea.className = 'message-area active';
+            if (type === 'error') {
+                messageOutputArea.classList.add('error-message');
+            } else if (type === 'info') {
+                messageOutputArea.classList.add('info-message');
+            }
+            if (type === 'info') {
+                 setTimeout(clearMessage, 4000);
+            }
+        }
+
+        function clearMessage() {
+            messageOutputArea.textContent = '';
+            messageOutputArea.className = 'message-area';
+        }
+        
+        function generateConnectingLines(numPaths, actualDrawingWidth, density) {
+            const lines = [];
+            if (numPaths <= 1) return lines;
+
+            let numXSlots;
+            const baseSlotsMultiplier = numPaths <= 3 ? 1.8 : (numPaths <= 6 ? 1.5 : 1.2); // 密度に応じて調整
+            const baseSlots = Math.ceil(numPaths * baseSlotsMultiplier) + (numPaths > 2 ? 4 : 2); // 最小本数確保
+
+            switch (density) {
+                case 'low':    numXSlots = Math.floor(baseSlots * 0.60); break;
+                case 'high':   numXSlots = Math.floor(baseSlots * 1.40); break;
+                default:       numXSlots = baseSlots; break; 
+            }
+            numXSlots = Math.max(Math.min(numPaths, 3), numPaths > 2 ? 4 : 1, numXSlots);
+
+            const xStep = actualDrawingWidth / (numXSlots + 1);
+
+            let slotDrawProbability;
+            let maxLinesPerSlotRatio;
+
+            switch (density) {
+                case 'low':    slotDrawProbability = 0.40; maxLinesPerSlotRatio = 0.22; break;
+                case 'high':   slotDrawProbability = 0.95; maxLinesPerSlotRatio = 0.80; break;
+                default:       slotDrawProbability = 0.75; maxLinesPerSlotRatio = 0.55; break;
+            }
+             if (numPaths === 2) {
+                 slotDrawProbability = density === 'low' ? 0.6 : (density === 'medium' ? 0.85 : 1.0);
+                 maxLinesPerSlotRatio = 1.0;
+                 numXSlots = Math.max(1, numXSlots); // 2本線の場合はスロット数1以上
+            }
+
+
+            for (let i = 0; i < numXSlots; i++) {
+                if (Math.random() > slotDrawProbability) continue;
+
+                const x = xStep * (i + 1);
+                
+                const availablePathPairsIndices = []; 
+                for (let j = 0; j < numPaths - 1; j++) { 
+                    availablePathPairsIndices.push(j);
+                }
+                for (let k = availablePathPairsIndices.length - 1; k > 0; k--) {
+                    const l = Math.floor(Math.random() * (k + 1));
+                    [availablePathPairsIndices[k], availablePathPairsIndices[l]] = [availablePathPairsIndices[l], availablePathPairsIndices[k]];
+                }
+
+                const maxPossibleLinesThisSlot = (numPaths === 2) ? 1 : Math.floor((numPaths-1)/2) + ((numPaths-1)%2);
+                
+                let numLinesToDrawThisSlot = 0;
+                if (numPaths === 2) {
+                    numLinesToDrawThisSlot = 1;
+                } else {
+                    numLinesToDrawThisSlot = Math.max(1, Math.floor(maxPossibleLinesThisSlot * maxLinesPerSlotRatio * (0.5 + Math.random()*0.5)));
+                    numLinesToDrawThisSlot = Math.min(numLinesToDrawThisSlot, maxPossibleLinesThisSlot);
+                }
+
+                const drawnOnThisSlot = new Set(); 
+                let drawnCount = 0;
+
+                for (const pathIdx of availablePathPairsIndices) {
+                    if (drawnCount >= numLinesToDrawThisSlot) break;
+                    if (!drawnOnThisSlot.has(pathIdx) && !drawnOnThisSlot.has(pathIdx + 1)) {
+                         lines.push({ x: x, path1: pathIdx, path2: pathIdx + 1 }); 
+                         drawnOnThisSlot.add(pathIdx);
+                         drawnOnThisSlot.add(pathIdx + 1);
+                         drawnCount++;
+                    }
+                }
+            }
+            return lines.sort((a,b) => a.x - b.x);
+        }
+
+        function drawAmidakuji() {
+            clearMessage();
+            svgContainer.innerHTML = ''; 
+            currentAmidaData.goalTextElements = []; 
+
+            const { startLabels, goalLabels, numPaths, connectingLines } = currentAmidaData;
+
+            if (numPaths === 0) {
+                svgContainer.innerHTML = '<p>スタート項目を入力してください。</p>';
+                return;
+            }
+            
+            const minPathSpacing = 30; // 最小間隔
+            const maxPathSpacing = 75; // 最大間隔
+            
+            // svgContainer の実際の高さを取得。CSSで flex-grow されていることを期待
+            const containerClientHeight = svgContainer.clientHeight;
+            // フォールバックとして window.innerHeight の一部を使用
+            const containerHeightForSpacing = Math.max(200, containerClientHeight || (window.innerHeight * 0.5));
+
+
+            let pathSpacing = minPathSpacing;
+            if (numPaths > 1) {
+                 // 利用可能な高さ全体からパディングを引いた値を項目数で割る
+                pathSpacing = (containerHeightForSpacing - 2 * PADDING) / (numPaths - 1);
+                pathSpacing = Math.max(minPathSpacing, Math.min(maxPathSpacing, pathSpacing));
+            } else { 
+                // 項目が1つの場合は、コンテナの中央に配置されるように高さを確保
+                pathSpacing = Math.max(minPathSpacing, containerHeightForSpacing - 2 * PADDING); 
+            }
+            
+            // SVGの高さは計算された pathSpacing に基づく
+            const svgHeight = (numPaths > 1 ? (numPaths - 1) * pathSpacing : pathSpacing) + 2 * PADDING;
+            
+            const svgContainerWidth = svgContainer.clientWidth || 300;
+            // actualDrawingWidth の計算でコンテナ幅をより活用
+            let baseDrawingWidth = Math.max(svgContainerWidth * 0.65, numPaths * 20); // 画面幅の割合を増やす
+            if (numPaths > 8) baseDrawingWidth = numPaths * 18 + 60;
+            if (numPaths > 15) baseDrawingWidth = numPaths * 16 + 90;
+            if (numPaths > 25) baseDrawingWidth = numPaths * 15 + 120;
+            
+            let actualDrawingWidth = Math.min(baseDrawingWidth, svgContainerWidth - TEXT_AREA_WIDTH_LEFT - TEXT_AREA_WIDTH_RIGHT - PADDING * 2 - 10);
+            actualDrawingWidth = Math.max(100, actualDrawingWidth); // 最小描画幅
+
+            const svgWidth = actualDrawingWidth + TEXT_AREA_WIDTH_LEFT + TEXT_AREA_WIDTH_RIGHT + 2 * PADDING;
+
+            currentAmidaData.pathSpacing = pathSpacing;
+            currentAmidaData.svgWidth = svgWidth;
+            currentAmidaData.svgHeight = svgHeight;
+            currentAmidaData.actualDrawingWidth = actualDrawingWidth;
+
+            const svg = document.createElementNS(SVG_NS, "svg");
+            svg.setAttribute("width", svgWidth);
+            svg.setAttribute("height", svgHeight);
+            svg.setAttribute("viewBox", `0 0 ${svgWidth} ${svgHeight}`);
+
+            for (let i = 0; i < numPaths; i++) {
+                const y = PADDING + i * pathSpacing;
+                const line = document.createElementNS(SVG_NS, "line");
+                line.setAttribute("x1", PADDING + TEXT_AREA_WIDTH_LEFT);
+                line.setAttribute("y1", y);
+                line.setAttribute("x2", svgWidth - PADDING - TEXT_AREA_WIDTH_RIGHT);
+                line.setAttribute("y2", y);
+                line.classList.add("amida-path-line");
+                svg.appendChild(line);
+            }
+
+            connectingLines.forEach(cLine => {
+                const x = PADDING + TEXT_AREA_WIDTH_LEFT + cLine.x;
+                const y1 = PADDING + cLine.path1 * pathSpacing;
+                const y2 = PADDING + cLine.path2 * pathSpacing;
+                const line = document.createElementNS(SVG_NS, "line");
+                line.setAttribute("x1", x);
+                line.setAttribute("y1", y1);
+                line.setAttribute("x2", x);
+                line.setAttribute("y2", y2);
+                line.classList.add("amida-connecting-line");
+                svg.appendChild(line);
+            });
+            
+            // フォントサイズをパス間隔に応じて調整、より見やすく
+            const fontSize = Math.max(10, Math.min(14.5, Math.floor(pathSpacing * 0.36))); 
+
+            for (let i = 0; i < numPaths; i++) {
+                const yPos = PADDING + i * pathSpacing;
+
+                const startText = document.createElementNS(SVG_NS, "text");
+                startText.setAttribute("x", PADDING + TEXT_AREA_WIDTH_LEFT / 2);
+                startText.setAttribute("y", yPos);
+                startText.setAttribute("text-anchor", "middle");
+                startText.setAttribute("dominant-baseline", "middle");
+                startText.setAttribute("font-size", `${fontSize}px`);
+                startText.textContent = startLabels[i];
+                startText.classList.add("start-text");
+                startText.dataset.startIndex = i;
+                startText.addEventListener('click', handleStartTextClick);
+                svg.appendChild(startText);
+
+                const goalText = document.createElementNS(SVG_NS, "text");
+                goalText.setAttribute("x", svgWidth - PADDING - TEXT_AREA_WIDTH_RIGHT / 2);
+                goalText.setAttribute("y", yPos);
+                goalText.setAttribute("text-anchor", "middle");
+                goalText.setAttribute("dominant-baseline", "middle");
+                goalText.setAttribute("font-size", `${fontSize}px`);
+                goalText.textContent = goalLabels[i];
+                goalText.classList.add("goal-text"); 
+                currentAmidaData.goalTextElements.push(goalText); 
+                svg.appendChild(goalText);
+            }
+            
+            svgContainer.appendChild(svg);
+        }
+
+        function calculatePath(startIndex) {
+            const { numPaths, connectingLines, pathSpacing, svgWidth, actualDrawingWidth } = currentAmidaData;
+            if (startIndex < 0 || startIndex >= numPaths) return null;
+
+            let currentPathIndex = startIndex; 
+            let currentX = PADDING + TEXT_AREA_WIDTH_LEFT;
+            
+            const pathCoords = [];
+            pathCoords.push({ x: currentX, y: PADDING + currentPathIndex * pathSpacing });
+
+            // 接続線をX座標でソートしておく (generateConnectingLinesでソート済みなら不要だが念のため)
+            const sortedConnectingLines = [...connectingLines].sort((a, b) => a.x - b.x);
+
+
+            for (const cLine of sortedConnectingLines) {
+                const cLineAbsoluteX = PADDING + TEXT_AREA_WIDTH_LEFT + cLine.x;
+                
+                // 既に通過したX座標の線はスキップ (誤差を考慮)
+                if (cLineAbsoluteX < currentX - 0.001) continue;
+
+                if (cLine.path1 === currentPathIndex && cLine.path2 === currentPathIndex + 1) { 
+                    // 下へ移動
+                    pathCoords.push({ x: cLineAbsoluteX, y: PADDING + currentPathIndex * pathSpacing });
+                    currentPathIndex = cLine.path2; 
+                    pathCoords.push({ x: cLineAbsoluteX, y: PADDING + currentPathIndex * pathSpacing });
+                    currentX = cLineAbsoluteX; 
+                } else if (cLine.path2 === currentPathIndex && cLine.path1 === currentPathIndex - 1) {
+                    // 上へ移動
+                    pathCoords.push({ x: cLineAbsoluteX, y: PADDING + currentPathIndex * pathSpacing });
+                    currentPathIndex = cLine.path1; 
+                    pathCoords.push({ x: cLineAbsoluteX, y: PADDING + currentPathIndex * pathSpacing });
+                    currentX = cLineAbsoluteX;
+                }
+            }
+            // ゴールまでの最後の直線
+            pathCoords.push({ x: PADDING + TEXT_AREA_WIDTH_LEFT + actualDrawingWidth, y: PADDING + currentPathIndex * pathSpacing });
+            
+            return { path: pathCoords, endPathIndex: currentPathIndex };
+        }
+        function drawTracedPath(pathData, color, animationDuration) {
+            if (currentTracedPathElement) {
+                currentTracedPathElement.remove();
+            }
+            if (currentHighlightedGoalText) {
+                currentHighlightedGoalText.classList.remove('highlighted');
+                currentHighlightedGoalText.setAttribute("fill", TEXT_COLOR);
+            }
+
+            const path = document.createElementNS(SVG_NS, "path");
+            const d = pathData.path.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+            path.setAttribute("d", d);
+            path.setAttribute("stroke", color);
+            path.setAttribute("stroke-width", "3"); // トレース線を少し太く
+            path.setAttribute("fill", "none");
+            path.classList.add("path-trace");
+            
+            const svgElement = svgContainer.querySelector("svg");
+            if (svgElement) {
+                // 元のシンプルな追加方法: SVGの子要素の最後にパスを追加（最前面に表示）
+                svgElement.appendChild(path); 
+
+                currentTracedPathElement = path;
+
+                const length = path.getTotalLength();
+                path.style.strokeDasharray = length;
+                path.style.strokeDashoffset = length;
+                
+                path.getBoundingClientRect(); // Reflow to apply initial dashoffset before transition
+
+                path.style.transition = `stroke-dashoffset ${animationDuration}s ease-in-out`;
+                path.style.strokeDashoffset = '0';
+
+                setTimeout(() => {
+                    if (currentAmidaData.goalTextElements[pathData.endPathIndex]) {
+                        const goalEl = currentAmidaData.goalTextElements[pathData.endPathIndex];
+                        goalEl.classList.add('highlighted');
+                        goalEl.setAttribute("fill", color); 
+                        currentHighlightedGoalText = goalEl;
+                    }
+                }, animationDuration * 1000); 
+            }
+        }
+        /*function drawTracedPath(pathData, color, animationDuration) {
+            if (currentTracedPathElement) {
+                currentTracedPathElement.remove();
+            }
+            if (currentHighlightedGoalText) {
+                currentHighlightedGoalText.classList.remove('highlighted');
+                currentHighlightedGoalText.setAttribute("fill", TEXT_COLOR);
+            }
+
+            const path = document.createElementNS(SVG_NS, "path");
+            const d = pathData.path.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+            path.setAttribute("d", d);
+            path.setAttribute("stroke", color);
+            path.setAttribute("stroke-width", "3"); // トレース線を少し太く
+            path.setAttribute("fill", "none");
+            path.classList.add("path-trace");
+            
+            const svgElement = svgContainer.querySelector("svg");
+            if (svgElement) {
+                // パスを一番手前に描画するため、最後にappendするのではなく、テキストよりは手前、線よりは奥にする
+                // または、専用のグループを作ってその中に入れると制御しやすい
+                // ここではシンプルに既存の線よりは後に（手前に）描画されるようにする
+                const firstLineElement = svgElement.querySelector(".amida-path-line");
+                 if (firstLineElement) {
+                    svgElement.insertBefore(path, firstLineElement.nextSibling); // 線のすぐ後ろ（手前）
+                } else {
+                    svgElement.appendChild(path); 
+                }
+
+                currentTracedPathElement = path;
+
+                const length = path.getTotalLength();
+                path.style.strokeDasharray = length;
+                path.style.strokeDashoffset = length;
+                
+                path.getBoundingClientRect(); 
+
+                path.style.transition = `stroke-dashoffset ${animationDuration}s ease-in-out`;
+                path.style.strokeDashoffset = '0';
+
+                setTimeout(() => {
+                    if (currentAmidaData.goalTextElements[pathData.endPathIndex]) {
+                        const goalEl = currentAmidaData.goalTextElements[pathData.endPathIndex];
+                        goalEl.classList.add('highlighted');
+                        goalEl.setAttribute("fill", color); 
+                        currentHighlightedGoalText = goalEl;
+                    }
+                }, animationDuration * 1000); 
+            }
+        }*/
+        
+        function handleStartTextClick(event) {
+            const startIndex = parseInt(event.target.dataset.startIndex);
+            const pathResult = calculatePath(startIndex);
+            const animationDuration = parseFloat(animationSpeedSelect.value);
+
+            if (pathResult) {
+                const color = TRACE_COLORS[startIndex % TRACE_COLORS.length];
+                drawTracedPath(pathResult, color, animationDuration);
+            }
+        }
+
+        generateButton.addEventListener('click', () => {
+            clearMessage();
+            if (currentTracedPathElement) {
+                currentTracedPathElement.remove();
+                currentTracedPathElement = null;
+            }
+             if (currentHighlightedGoalText) {
+                currentHighlightedGoalText.classList.remove('highlighted');
+                currentHighlightedGoalText.setAttribute("fill", TEXT_COLOR);
+                currentHighlightedGoalText = null;
+            }
+
+            let startLabels = parseItems(startItemsTextarea.value);
+            let goalLabels = parseItems(goalItemsTextarea.value);
+
+            if (startLabels.length === 0) {
+                displayMessage("スタート項目を1つ以上入力してください。", 'error');
+                svgContainer.innerHTML = '<p>スタート項目を入力してください。</p>';
+                return;
+            }
+            if (startLabels.length > 40) { // 項目数上限を少し調整
+                displayMessage("スタート項目は最大40個までです。", 'error');
+                return;
+            }
+
+            if (goalLabels.length === 0) {
+                goalLabels = startLabels.map((_, i) => `結果 ${i + 1}`);
+            } else if (goalLabels.length !== startLabels.length) {
+                displayMessage("スタート項目とゴール項目の数は一致させてください。", 'error');
+                return;
+            }
+            
+            currentAmidaData.startLabels = startLabels;
+            currentAmidaData.goalLabels = goalLabels; 
+            currentAmidaData.numPaths = startLabels.length;
+            
+            // `drawAmidakuji` を呼ぶ前に `actualDrawingWidth` を計算するための準備
+            // 一度 `drawAmidakuji` を呼んで `actualDrawingWidth` を確定させ、それから接続線を生成する
+            drawAmidakuji(); // 初回描画でSVGサイズと actualDrawingWidth を計算
+
+             if (currentAmidaData.numPaths > 0) {
+                currentAmidaData.connectingLines = generateConnectingLines(
+                    currentAmidaData.numPaths,
+                    currentAmidaData.actualDrawingWidth, // drawAmidakujiで計算された値を使用
+                    densitySelect.value
+                );
+                // 再描画して接続線を反映
+                drawAmidakuji();
+            }
+        });
+
+        resetButton.addEventListener('click', () => {
+            startItemsTextarea.value = '';
+            goalItemsTextarea.value = '';
+            densitySelect.value = 'medium';
+            animationSpeedSelect.value = '1.0';
+
+            svgContainer.innerHTML = '<p>ここに、あみだくじが表示されます。</p>';
+            clearMessage();
+            displayMessage('リセットしました。新しいくじを入力できます。', 'info');
+
+            if (currentTracedPathElement) {
+                currentTracedPathElement.remove();
+                currentTracedPathElement = null;
+            }
+            if (currentHighlightedGoalText) {
+                currentHighlightedGoalText.classList.remove('highlighted');
+                currentHighlightedGoalText.setAttribute("fill", TEXT_COLOR);
+                currentHighlightedGoalText = null;
+            }
+
+            currentAmidaData = {
+                startLabels: [],
+                goalLabels: [],
+                numPaths: 0,
+                connectingLines: [],
+                pathSpacing: 0,
+                svgWidth: 0,
+                svgHeight: 0,
+                actualDrawingWidth: 0,
+                goalTextElements: []
+            };
+        });
+        // 初期表示
+        svgContainer.innerHTML = '<p>あみだくじの項目を入力して「あみだを作成」ボタンを押してください。</p>';
+
+        // ウィンドウリサイズ時にも再描画を試みる (オプション)
+        // ただし、頻繁なリサイズはパフォーマンスに影響する可能性があるので注意
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (currentAmidaData.numPaths > 0) {
+                    // 接続線は維持したまま再描画
+                    drawAmidakuji();
+                    // もしトレース中のパスがあれば、それも再計算・再描画が必要になる
+                    // ここでは簡略化のため、トレースパスはリセットする
+                     if (currentTracedPathElement) {
+                        currentTracedPathElement.remove();
+                        currentTracedPathElement = null;
+                    }
+                    if (currentHighlightedGoalText) {
+                        currentHighlightedGoalText.classList.remove('highlighted');
+                        currentHighlightedGoalText.setAttribute("fill", TEXT_COLOR);
+                        currentHighlightedGoalText = null;
+                    }
+                }
+            }, 250);
+        });
+
+    </script>
+</body>
+</html>
